@@ -462,16 +462,209 @@ def get_offer_count_history(asin, months=12):
         print(f"Error type: {type(e).__name__}")
         return None
 
-def analyze_buy_box_competition(asin, months=12):
+# def analyze_buy_box_competition(asin, months=12):
+#     """
+#     Analyze Buy Box competition by tracking price and ownership changes.
+    
+#     Args:
+#         asin: Amazon ASIN (string or list)
+#         months: Number of months of history to analyze (default: 12)
+        
+#     Returns:
+#         Dictionary with Buy Box competition metrics
+#     """
+#     # Initialize Keepa API
+#     api = keepa.Keepa(API_KEY)
+    
+#     print(f"Initial tokens left: {api.tokens_left}")
+    
+#     # Ensure asin is a list
+#     if isinstance(asin, str):
+#         asin = [asin]
+    
+#     print(f"Requesting Buy Box data for ASIN(s): {asin}")
+
+#     try:
+#         # Query the API with necessary parameters
+#         products = api.query(
+#             asin,
+#             domain="US",
+#             history=True,
+#             update=1,
+#             offers=20  # Need offers data to get Buy Box information
+#         )
+
+#         if not products:
+#             print(f"No data found for ASIN: {asin}")
+#             return None
+
+#         product = products[0]
+#         print(f"Product title: {product.get('title', 'No title available')}")
+        
+#         # Check for Buy Box data fields
+#         required_fields = [
+#             "BUY_BOX_SHIPPING",
+#             "BUY_BOX_SHIPPING_time",
+#             "BUY_BOX_IS_FBA",  # Indicates if Buy Box winner is FBA
+#             "BUY_BOX_IS_AMAZON"  # Indicates if Buy Box winner is Amazon
+#         ]
+        
+#         if "data" not in product or not all(field in product["data"] for field in required_fields):
+#             print("Buy Box data not available for this product")
+#             return {
+#                 "monthly_metrics": {},
+#                 "error": "Buy Box data not available"
+#             }
+        
+#         # Extract Buy Box history
+#         bb_prices = product["data"]["BUY_BOX_SHIPPING"]
+#         bb_times = product["data"]["BUY_BOX_SHIPPING_time"]
+#         bb_is_fba = product["data"]["BUY_BOX_IS_FBA"]
+#         bb_is_amazon = product["data"]["BUY_BOX_IS_AMAZON"]
+        
+#         # Create a dictionary to store monthly data
+#         monthly_data = defaultdict(lambda: {
+#             "price_changes": 0,
+#             "seller_changes": 0,
+#             "amazon_share": 0,
+#             "fba_share": 0,
+#             "fbm_share": 0,
+#             "total_datapoints": 0,
+#             "unique_prices": set(),
+#             "avg_price": 0,
+#             "price_volatility": 0
+#         })
+        
+#         # Process Buy Box history
+#         previous_price = None
+#         previous_seller_type = None
+        
+#         for i in range(len(bb_times)):
+#             # Skip invalid data points (-1 indicates no data)
+#             if bb_prices[i] == -1:
+#                 continue
+                
+#             # Convert timestamp to datetime
+#             if isinstance(bb_times[i], datetime.datetime):
+#                 date = bb_times[i]
+#             else:
+#                 date = datetime.datetime(1970, 1, 1) + datetime.timedelta(minutes=bb_times[i])
+            
+#             # Create month key
+#             month_key = f"{date.year}-{date.month:02d}"
+            
+#             # Determine seller type
+#             if bb_is_amazon[i]:
+#                 seller_type = "Amazon"
+#             elif bb_is_fba[i]:
+#                 seller_type = "FBA"
+#             else:
+#                 seller_type = "FBM"
+            
+#             # Track price changes
+#             if previous_price is not None and bb_prices[i] != previous_price:
+#                 monthly_data[month_key]["price_changes"] += 1
+            
+#             # Track seller type changes
+#             if previous_seller_type is not None and seller_type != previous_seller_type:
+#                 monthly_data[month_key]["seller_changes"] += 1
+            
+#             # Update seller type shares
+#             monthly_data[month_key]["total_datapoints"] += 1
+#             if seller_type == "Amazon":
+#                 monthly_data[month_key]["amazon_share"] += 1
+#             elif seller_type == "FBA":
+#                 monthly_data[month_key]["fba_share"] += 1
+#             else:
+#                 monthly_data[month_key]["fbm_share"] += 1
+            
+#             # Track prices
+#             monthly_data[month_key]["unique_prices"].add(bb_prices[i])
+            
+#             # Update previous values
+#             previous_price = bb_prices[i]
+#             previous_seller_type = seller_type
+        
+#         # Calculate monthly metrics
+#         result = {
+#             "monthly_metrics": {},
+#             "overall_metrics": {}
+#         }
+        
+#         sorted_months = sorted(monthly_data.keys())
+#         recent_months = sorted_months[-months:] if len(sorted_months) > months else sorted_months
+        
+#         total_changes = 0
+#         total_datapoints = 0
+        
+#         for month_key in recent_months:
+#             data = monthly_data[month_key]
+#             total_points = data["total_datapoints"]
+            
+#             if total_points > 0:
+#                 year, month = map(int, month_key.split('-'))
+#                 month_name = f"{calendar.month_name[month]} {year}"
+                
+#                 metrics = {
+#                     "price_changes": data["price_changes"],
+#                     "seller_changes": data["seller_changes"],
+#                     "unique_prices": len(data["unique_prices"]),
+#                     "amazon_share": round(data["amazon_share"] / total_points * 100, 2),
+#                     "fba_share": round(data["fba_share"] / total_points * 100, 2),
+#                     "fbm_share": round(data["fbm_share"] / total_points * 100, 2),
+#                     "competition_score": data["price_changes"] + data["seller_changes"]
+#                 }
+                
+#                 result["monthly_metrics"][month_name] = metrics
+#                 total_changes += metrics["competition_score"]
+#                 total_datapoints += total_points
+        
+#         # Calculate overall metrics
+#         if total_datapoints > 0:
+#             result["overall_metrics"] = {
+#                 "avg_monthly_changes": round(total_changes / len(recent_months), 2),
+#                 "competition_level": "High" if total_changes / len(recent_months) > 10 else 
+#                                    "Medium" if total_changes / len(recent_months) > 5 else 
+#                                    "Low"
+#             }
+        
+#         # Print summary
+#         print("\nBuy Box Competition Analysis:")
+#         print(f"Analyzed {len(result['monthly_metrics'])} months of data")
+        
+#         if result["monthly_metrics"]:
+#             print("\nMonthly Metrics:")
+#             for month, metrics in result["monthly_metrics"].items():
+#                 print(f"\n{month}:")
+#                 print(f"  Price Changes: {metrics['price_changes']}")
+#                 print(f"  Seller Changes: {metrics['seller_changes']}")
+#                 print(f"  Unique Prices: {metrics['unique_prices']}")
+#                 print(f"  Amazon Share: {metrics['amazon_share']}%")
+#                 print(f"  FBA Share: {metrics['fba_share']}%")
+#                 print(f"  FBM Share: {metrics['fbm_share']}%")
+        
+#         if "overall_metrics" in result:
+#             print(f"\nOverall Competition Level: {result['overall_metrics']['competition_level']}")
+#             print(f"Average Monthly Changes: {result['overall_metrics']['avg_monthly_changes']}")
+        
+#         return result
+
+#     except Exception as e:
+#         print(f"Error analyzing Buy Box competition: {e}")
+#         print(f"Error type: {type(e).__name__}")
+#         return None
+
+
+def analyze_price_stability(asin, months=12):
     """
-    Analyze Buy Box competition by tracking price and ownership changes.
+    Analyze price stability across different price types (Amazon, New, Used, Buy Box).
     
     Args:
         asin: Amazon ASIN (string or list)
         months: Number of months of history to analyze (default: 12)
         
     Returns:
-        Dictionary with Buy Box competition metrics
+        Dictionary with price stability metrics for each price type
     """
     # Initialize Keepa API
     api = keepa.Keepa(API_KEY)
@@ -482,16 +675,15 @@ def analyze_buy_box_competition(asin, months=12):
     if isinstance(asin, str):
         asin = [asin]
     
-    print(f"Requesting Buy Box data for ASIN(s): {asin}")
+    print(f"Requesting price history for ASIN(s): {asin}")
 
     try:
-        # Query the API with necessary parameters
+        # Query the API
         products = api.query(
             asin,
             domain="US",
             history=True,
-            update=1,
-            offers=20  # Need offers data to get Buy Box information
+            update=1
         )
 
         if not products:
@@ -501,156 +693,126 @@ def analyze_buy_box_competition(asin, months=12):
         product = products[0]
         print(f"Product title: {product.get('title', 'No title available')}")
         
-        # Check for Buy Box data fields
-        required_fields = [
-            "BUY_BOX_SHIPPING",
-            "BUY_BOX_SHIPPING_time",
-            "BUY_BOX_IS_FBA",  # Indicates if Buy Box winner is FBA
-            "BUY_BOX_IS_AMAZON"  # Indicates if Buy Box winner is Amazon
-        ]
+        # Define price types to track
+        price_types = {
+            "AMAZON": "Amazon Direct",
+            "NEW": "New 3rd Party",
+            "USED": "Used",
+            "BUY_BOX_SHIPPING": "Buy Box"
+        }
         
-        if "data" not in product or not all(field in product["data"] for field in required_fields):
-            print("Buy Box data not available for this product")
-            return {
-                "monthly_metrics": {},
-                "error": "Buy Box data not available"
-            }
-        
-        # Extract Buy Box history
-        bb_prices = product["data"]["BUY_BOX_SHIPPING"]
-        bb_times = product["data"]["BUY_BOX_SHIPPING_time"]
-        bb_is_fba = product["data"]["BUY_BOX_IS_FBA"]
-        bb_is_amazon = product["data"]["BUY_BOX_IS_AMAZON"]
-        
-        # Create a dictionary to store monthly data
-        monthly_data = defaultdict(lambda: {
-            "price_changes": 0,
-            "seller_changes": 0,
-            "amazon_share": 0,
-            "fba_share": 0,
-            "fbm_share": 0,
-            "total_datapoints": 0,
-            "unique_prices": set(),
-            "avg_price": 0,
-            "price_volatility": 0
-        })
-        
-        # Process Buy Box history
-        previous_price = None
-        previous_seller_type = None
-        
-        for i in range(len(bb_times)):
-            # Skip invalid data points (-1 indicates no data)
-            if bb_prices[i] == -1:
-                continue
-                
-            # Convert timestamp to datetime
-            if isinstance(bb_times[i], datetime.datetime):
-                date = bb_times[i]
-            else:
-                date = datetime.datetime(1970, 1, 1) + datetime.timedelta(minutes=bb_times[i])
-            
-            # Create month key
-            month_key = f"{date.year}-{date.month:02d}"
-            
-            # Determine seller type
-            if bb_is_amazon[i]:
-                seller_type = "Amazon"
-            elif bb_is_fba[i]:
-                seller_type = "FBA"
-            else:
-                seller_type = "FBM"
-            
-            # Track price changes
-            if previous_price is not None and bb_prices[i] != previous_price:
-                monthly_data[month_key]["price_changes"] += 1
-            
-            # Track seller type changes
-            if previous_seller_type is not None and seller_type != previous_seller_type:
-                monthly_data[month_key]["seller_changes"] += 1
-            
-            # Update seller type shares
-            monthly_data[month_key]["total_datapoints"] += 1
-            if seller_type == "Amazon":
-                monthly_data[month_key]["amazon_share"] += 1
-            elif seller_type == "FBA":
-                monthly_data[month_key]["fba_share"] += 1
-            else:
-                monthly_data[month_key]["fbm_share"] += 1
-            
-            # Track prices
-            monthly_data[month_key]["unique_prices"].add(bb_prices[i])
-            
-            # Update previous values
-            previous_price = bb_prices[i]
-            previous_seller_type = seller_type
-        
-        # Calculate monthly metrics
         result = {
-            "monthly_metrics": {},
+            "monthly_prices": {},
+            "stability_metrics": {},
             "overall_metrics": {}
         }
         
-        sorted_months = sorted(monthly_data.keys())
-        recent_months = sorted_months[-months:] if len(sorted_months) > months else sorted_months
-        
-        total_changes = 0
-        total_datapoints = 0
-        
-        for month_key in recent_months:
-            data = monthly_data[month_key]
-            total_points = data["total_datapoints"]
+        # Process each price type
+        for price_field, price_name in price_types.items():
+            if price_field not in product.get("data", {}) or f"{price_field}_time" not in product["data"]:
+                print(f"No {price_name} price data available")
+                continue
             
-            if total_points > 0:
-                year, month = map(int, month_key.split('-'))
-                month_name = f"{calendar.month_name[month]} {year}"
+            prices = product["data"][price_field]
+            timestamps = product["data"][f"{price_field}_time"]
+            
+            # Create a dictionary to store monthly data
+            monthly_data = defaultdict(list)
+            
+            # Process timestamps and prices
+            for i, timestamp in enumerate(timestamps):
+                # Skip invalid prices (-1 indicates no data)
+                if prices[i] == -1:
+                    continue
                 
-                metrics = {
-                    "price_changes": data["price_changes"],
-                    "seller_changes": data["seller_changes"],
-                    "unique_prices": len(data["unique_prices"]),
-                    "amazon_share": round(data["amazon_share"] / total_points * 100, 2),
-                    "fba_share": round(data["fba_share"] / total_points * 100, 2),
-                    "fbm_share": round(data["fbm_share"] / total_points * 100, 2),
-                    "competition_score": data["price_changes"] + data["seller_changes"]
+                # Convert timestamp to datetime
+                if isinstance(timestamp, datetime.datetime):
+                    date = timestamp
+                else:
+                    date = datetime.datetime(1970, 1, 1) + datetime.timedelta(minutes=timestamp)
+                
+                # Create month key
+                month_key = f"{date.year}-{date.month:02d}"
+                
+                # Add the price to the appropriate month
+                # Convert price to dollars (Keepa stores prices in cents)
+                monthly_data[month_key].append(prices[i] / 100)
+            
+            # Sort months and get recent ones
+            sorted_months = sorted(monthly_data.keys())
+            recent_months = sorted_months[-months:] if len(sorted_months) > months else sorted_months
+            
+            # Calculate monthly metrics
+            price_metrics = {}
+            all_prices = []
+            
+            for month_key in recent_months:
+                month_prices = monthly_data[month_key]
+                if month_prices:
+                    year, month = map(int, month_key.split('-'))
+                    month_name = f"{calendar.month_name[month]} {year}"
+                    
+                    metrics = {
+                        "min_price": round(min(month_prices), 2),
+                        "max_price": round(max(month_prices), 2),
+                        "avg_price": round(sum(month_prices) / len(month_prices), 2),
+                        "price_changes": len(set(month_prices)) - 1,
+                        "volatility": round(np.std(month_prices), 2) if len(month_prices) > 1 else 0
+                    }
+                    
+                    # Calculate price range as a percentage of average price
+                    price_range = metrics["max_price"] - metrics["min_price"]
+                    price_range_percent = (price_range / metrics["avg_price"]) * 100 if metrics["avg_price"] > 0 else 0
+                    metrics["price_range_percent"] = round(price_range_percent, 2)
+                    
+                    price_metrics[month_name] = metrics
+                    all_prices.extend(month_prices)
+            
+            if all_prices:
+                # Calculate overall stability metrics
+                overall_metrics = {
+                    "min_price": round(min(all_prices), 2),
+                    "max_price": round(max(all_prices), 2),
+                    "avg_price": round(sum(all_prices) / len(all_prices), 2),
+                    "total_price_changes": len(set(all_prices)) - 1,
+                    "overall_volatility": round(np.std(all_prices), 2),
                 }
                 
-                result["monthly_metrics"][month_name] = metrics
-                total_changes += metrics["competition_score"]
-                total_datapoints += total_points
-        
-        # Calculate overall metrics
-        if total_datapoints > 0:
-            result["overall_metrics"] = {
-                "avg_monthly_changes": round(total_changes / len(recent_months), 2),
-                "competition_level": "High" if total_changes / len(recent_months) > 10 else 
-                                   "Medium" if total_changes / len(recent_months) > 5 else 
-                                   "Low"
-            }
+                # Calculate overall price range as a percentage
+                overall_range = overall_metrics["max_price"] - overall_metrics["min_price"]
+                overall_range_percent = (overall_range / overall_metrics["avg_price"]) * 100 if overall_metrics["avg_price"] > 0 else 0
+                overall_metrics["price_range_percent"] = round(overall_range_percent, 2)
+                
+                # Determine price stability level
+                if overall_range_percent <= 10:
+                    stability_level = "Very Stable"
+                elif overall_range_percent <= 20:
+                    stability_level = "Stable"
+                elif overall_range_percent <= 30:
+                    stability_level = "Moderately Stable"
+                else:
+                    stability_level = "Volatile"
+                
+                overall_metrics["stability_level"] = stability_level
+                
+                # Store results
+                result["monthly_prices"][price_name] = price_metrics
+                result["stability_metrics"][price_name] = overall_metrics
         
         # Print summary
-        print("\nBuy Box Competition Analysis:")
-        print(f"Analyzed {len(result['monthly_metrics'])} months of data")
-        
-        if result["monthly_metrics"]:
-            print("\nMonthly Metrics:")
-            for month, metrics in result["monthly_metrics"].items():
-                print(f"\n{month}:")
-                print(f"  Price Changes: {metrics['price_changes']}")
-                print(f"  Seller Changes: {metrics['seller_changes']}")
-                print(f"  Unique Prices: {metrics['unique_prices']}")
-                print(f"  Amazon Share: {metrics['amazon_share']}%")
-                print(f"  FBA Share: {metrics['fba_share']}%")
-                print(f"  FBM Share: {metrics['fbm_share']}%")
-        
-        if "overall_metrics" in result:
-            print(f"\nOverall Competition Level: {result['overall_metrics']['competition_level']}")
-            print(f"Average Monthly Changes: {result['overall_metrics']['avg_monthly_changes']}")
+        print("\nPrice Stability Analysis:")
+        for price_type, metrics in result["stability_metrics"].items():
+            print(f"\n{price_type} Prices:")
+            print(f"Price Range: ${metrics['min_price']} - ${metrics['max_price']}")
+            print(f"Average Price: ${metrics['avg_price']}")
+            print(f"Price Range: {metrics['price_range_percent']}% of average price")
+            print(f"Total Price Changes: {metrics['total_price_changes']}")
+            print(f"Stability Level: {metrics['stability_level']}")
         
         return result
 
     except Exception as e:
-        print(f"Error analyzing Buy Box competition: {e}")
+        print(f"Error analyzing price stability: {e}")
         print(f"Error type: {type(e).__name__}")
         return None
 
@@ -663,9 +825,16 @@ print("\n=== REVIEW COUNT HISTORY ===")
 review_data = get_review_count_history(asin)
 print(review_data)
 
-print("\n=== OFFER COUNT HISTORY ===") # this one didnt work for curr asin
+print("\n=== OFFER COUNT HISTORY ===") # only curr offer count works, not historical
 offer_data = get_offer_count_history(asin)
 print(offer_data)
 
-print("\n=== BUY BOX COMPETITION ANALYSIS ===") # this one didnt work for curr asin
-competition_data = analyze_buy_box_competition(asin)
+# print("\n=== BUY BOX COMPETITION ANALYSIS ===") # not working
+# competition_data = analyze_buy_box_competition(asin)
+
+print("\n=== PRICE STABILITY ANALYSIS ===")
+price_stability = analyze_price_stability(asin)
+print(price_stability)
+
+
+
